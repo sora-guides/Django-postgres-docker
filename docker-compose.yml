@@ -1,0 +1,57 @@
+# Объявление блока с переменными postgres.
+# При объявлении обязательно указать префикс "x-" перед названием блока переменных 
+x-postgres-variables: &postgres-variables
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_DATABASE}
+
+x-server-variables: &server-variables
+  # Для получения переменных с .env файла используется такой синтаксис.
+  # VARIABLE_NAME: ${ENV-VARIABLE}
+  # При наименовании переменных, используйте те слова, которые написаны в самом коде.
+  SECRET_KEY: ${SECRET_KEY}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+  DEBUG: ${DEBUG}
+  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DATABASE}
+
+services:
+  postgres: # Название сервиса.
+    image: postgres:16.6 # Образ, на котором будет строиться контейнер.
+
+    # Наименование контейнера (вовсе не обязательно ставить его).
+    container_name: django-database 
+
+    # Определенные сервисы и программы запрашивают секретные данные или аргументы (обычно их прячут в ".env" файле для безопасности).
+    # Для получения таких данных, используется "environment". 
+    # Пример на django: SECRET_KEY = getenv("SECRET_KEY"), где SECRET_KEY хранится в ".env" файле.
+    # Для postgres нужны аргументы POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB.
+    # Для распаковки блока, используется префикс "*"
+    environment: *postgres-variables
+
+    # Так как порт 5432 уже занят на локальной машине, я использую 5433 вместо него.
+    # Если же вы не пользуетесь postgres на своем устройстве, можете воспользоваться стандартным портом.
+    ports:
+      - "5433:5432" # Пробресываем порт, для получения доступа из вне контейнера.
+
+    # volumes - инструмент, отключающий привязку данных к жизненному циклу контейнера. 
+    # т.е., даже после удаления и обратной сборки контейнера, данные никуда не денутся.
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+  
+  server: # Название сервиса.
+    build: # Создание докер изображения, используя Dockerfile указанный по пути context: path/to/Dockerfile
+      context: . # Будь Dockerfile в директории "/etc", context выглядел бы подобным образом: context: ./etc
+
+    container_name: django-server # Наименование контейнера.
+
+    environment: *server-variables # Распаковка блока переменных.
+
+    ports:
+      - "8000:8000" # Пробресываем порт, для получения доступа из вне контейнера.
+
+    depends_on: # Данная запись гарантирует запуск этого сервиса только после контейнера ниже.
+      - postgres # Запуск после контейнера "postgres".
+
+
+volumes: # Объявляем volume использованный выше в "postgres".
+  pg_data: 
